@@ -5,7 +5,7 @@ import Quiz from '../models/Quiz.js';
 import StudentQuizResult from '../models/StudentQuizResult.js';
 import Feedback from '../models/Feedback.js';
 import Attendance from '../models/Attendance.js';
-
+import { authMiddleware } from '../middleware/authMiddleware.js'; 
 export const getSchedule = async (req, res) => {
   try {
     const student = await User.findById(req.user.id).populate('class');
@@ -23,6 +23,7 @@ export const getSchedule = async (req, res) => {
     res.status(500).json({ message: 'Eroare de server' });
   }
 };
+
 
 export const getLesson = async (req, res) => {
   try {
@@ -51,6 +52,59 @@ export const getLesson = async (req, res) => {
   }
 };
 
+// routes/studentRoutes.js
+
+
+// controllers/studentController.js
+
+export const getQuizForLesson = async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+    const lesson = await Lesson.findById(lessonId).populate('quiz');
+
+    if (!lesson || !lesson.quiz) {
+      return res.status(404).json({ message: 'Quiz-ul nu a fost găsit pentru această lecție' });
+    }
+
+    const quiz = await Quiz.findById(lesson.quiz).populate('questions');
+
+    res.json({ quiz });
+  } catch (error) {
+    console.error('Eroare la obținerea quiz-ului:', error);
+    res.status(500).json({ message: 'Eroare de server' });
+  }
+};
+export const submitQuizAnswers = async (req, res) => {
+    try {
+      const { lessonId } = req.params;
+      const { answers } = req.body;
+      const studentId = req.user.id;
+  
+      const lesson = await Lesson.findById(lessonId).populate('quiz');
+  
+      if (!lesson || !lesson.quiz) {
+        return res.status(404).json({ message: 'Quiz-ul nu a fost găsit pentru această lecție' });
+      }
+  
+      const quiz = await Quiz.findById(lesson.quiz).populate('questions');
+  
+      // Calculăm scorul
+      let score = 0;
+      quiz.questions.forEach((question, index) => {
+        if (question.correctOption === answers[index]) {
+          score++;
+        }
+      });
+  
+      // Salvăm rezultatul în baza de date dacă este necesar
+      // Exemplu: creăm un nou document Result sau actualizăm profilul studentului
+  
+      res.json({ score });
+    } catch (error) {
+      console.error('Eroare la trimiterea răspunsurilor quiz-ului:', error);
+      res.status(500).json({ message: 'Eroare de server' });
+    }
+  };
 export const submitQuiz = async (req, res) => {
     try {
       const quiz = await Quiz.findById(req.params.id);
