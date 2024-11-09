@@ -17,7 +17,11 @@ import studentRoutes from './routes/studentRoutes.js';
 let extractedText = '';
 
 // Middleware to enable CORS
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:3000', // Permite cereri de la această origine
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Metodele HTTP permise
+    credentials: true, // Permite trimiterea de cookie-uri și alte credențiale
+  }));
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/teacher', teacherRoutes);

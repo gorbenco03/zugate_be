@@ -2,7 +2,7 @@
 import { Mistral } from '@mistralai/mistralai';
 // require('dotenv').config();
 import dotenv, { config } from 'dotenv';
-
+import mongoose from 'mongoose';
 config();
 
 // Initialize the Mistral client with the API key from the environment

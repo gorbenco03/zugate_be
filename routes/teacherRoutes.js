@@ -3,7 +3,7 @@ import express from 'express';
 import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
 import { createLesson, uploadPDF, addGrades } from '../controllers/teacherController.js';
 import upload from '../middleware/uploadMiddleware.js';
-import { getQuizStatistics, getQuizFeedback } from '../controllers/teacherController.js';
+import { getQuizStatistics, getQuizFeedback , getLessonsByDate} from '../controllers/teacherController.js';
 const router = express.Router();
 
 // Rute pentru profesori
@@ -12,4 +12,5 @@ router.post('/lessons/:id/upload', protect, authorizeRoles('teacher'), upload.si
 router.post('/lessons/:lessonId/grades', protect, authorizeRoles('teacher'), addGrades);
 router.get('/quizzes/:quizId/statistics', protect, authorizeRoles('teacher'), getQuizStatistics);
 router.get('/quizzes/:quizId/feedback', protect, authorizeRoles('teacher'), getQuizFeedback);
+router.get('/lessons', protect, authorizeRoles('teacher'), getLessonsByDate);
 export default router;

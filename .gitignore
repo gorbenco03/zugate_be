@@ -1,2 +1,12 @@
 .env
-node_modules
+node_modulesfii atent,  vom folosi cel mai probabil mongo db 
+si eu am nevoie de baza de date pentru aplicatia mea
+sa ti explic ce face aplicatia mea 
+e o platforma pentru invatamant
+1. Exista profesori si 2 exista elevevi
+profesorul pana cand are urmatoarele posibilitati sa incarce un pdf si sa faca un quiz care sa-l posteze, iar elevii trebuie sa treaca acest quiz, si in baza rezultatelor de la quiz, se va face un prompt catre ai care va sugera ce anume e nevoie de invatat mai bine 
+la fel profesorul poate sa adauge un calificativ pentru elev la sfarsitul lectiei. 
+
+2. Elevul se logheaza in aplicatie si lui ii apare orarul pe fiecare zi, si cand apasa pe una dintre lectiile din orar el acceaseaza pagina aia, acolo are mai multe optiuni, sa treaca quiz-ul propus de catre profesor, sa dea feedback la profesor, sa si puna prezenta. 
+
+pana cand acestea sunt functionalitatile de baza, acum te rog sa ma ajuti cu baza de date, te rog mult sa ma ajuti 

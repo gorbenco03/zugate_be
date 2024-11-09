@@ -66,7 +66,7 @@ export const loginUser = async (req, res) => {
   
       // Verificăm dacă utilizatorul există
       const user = await User.findOne({ email });
-      if (!user || user.role !== 'student') {
+      if (!user || user.r) {
         return res.status(400).json({ message: 'Credențiale invalide' });
       }
   

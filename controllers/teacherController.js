@@ -10,8 +10,6 @@ import StudentQuizResult from '../models/StudentQuizResult.js';
 
 import { getMistralFeedback } from '../src/api/mistral-feedback.js';
 
-
-
 export const createLesson = async (req, res) => {
   try {
     const { title, description, date, time, className } = req.body;
@@ -120,8 +118,6 @@ export const addGrades = async (req, res) => {
     res.status(500).json({ message: 'Eroare de server' });
   }
 };
-
-
 
 // Funcție internă pentru a obține statisticile fără a trimite răspuns HTTP
 const getQuizStatisticsInternal = async (quizId, teacherId) => {
@@ -251,6 +247,23 @@ export const getQuizFeedback = async (req, res) => {
     res.json({ feedback });
   } catch (error) {
     console.error('Eroare la obținerea feedback-ului de la Mistral AI:', error);
+    res.status(500).json({ message: 'Eroare de server' });
+  }
+};
+
+export const getLessonsByDate = async (req, res) => {
+  try {
+    const { date } = req.query;
+    const teacherId = req.user.id;
+
+    const lessons = await Lesson.find({
+      teacher: teacherId,
+      date: date
+    }).populate('class');
+
+    res.json(lessons);
+  } catch (error) {
+    console.error('Eroare la obținerea lecțiilor:', error);
     res.status(500).json({ message: 'Eroare de server' });
   }
 };

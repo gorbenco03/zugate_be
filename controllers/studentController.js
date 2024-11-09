@@ -5,7 +5,7 @@ import Quiz from '../models/Quiz.js';
 import StudentQuizResult from '../models/StudentQuizResult.js';
 import Feedback from '../models/Feedback.js';
 import Attendance from '../models/Attendance.js';
-import { authMiddleware } from '../middleware/authMiddleware.js'; 
+
 export const getSchedule = async (req, res) => {
   try {
     const student = await User.findById(req.user.id).populate('class');
@@ -57,24 +57,31 @@ export const getLesson = async (req, res) => {
 
 // controllers/studentController.js
 
+
+
 export const getQuizForLesson = async (req, res) => {
-  try {
-    const { lessonId } = req.params;
-    const lesson = await Lesson.findById(lessonId).populate('quiz');
-
-    if (!lesson || !lesson.quiz) {
-      return res.status(404).json({ message: 'Quiz-ul nu a fost găsit pentru această lecție' });
+    try {
+      const { lessonId } = req.params;
+      const lesson = await Lesson.findById(lessonId).populate('quiz');
+  
+      if (!lesson) {
+        return res.status(404).json({ message: 'Lesson not found.' });
+      }
+  
+      if (!lesson.quiz) {
+        return res.status(404).json({ message: 'Quiz not found for this lesson.' });
+      }
+  
+      const quiz = await Quiz.findById(lesson.quiz._id).populate('questions.options');
+  
+      res.json({ quiz });
+    } catch (error) {
+      console.error('Error fetching quiz:', error);
+      res.status(500).json({ message: 'Server error' });
     }
-
-    const quiz = await Quiz.findById(lesson.quiz).populate('questions');
-
-    res.json({ quiz });
-  } catch (error) {
-    console.error('Eroare la obținerea quiz-ului:', error);
-    res.status(500).json({ message: 'Eroare de server' });
-  }
-};
-export const submitQuizAnswers = async (req, res) => {
+  };
+  
+  export const submitQuizAnswers = async (req, res) => {
     try {
       const { lessonId } = req.params;
       const { answers } = req.body;
@@ -82,134 +89,163 @@ export const submitQuizAnswers = async (req, res) => {
   
       const lesson = await Lesson.findById(lessonId).populate('quiz');
   
-      if (!lesson || !lesson.quiz) {
-        return res.status(404).json({ message: 'Quiz-ul nu a fost găsit pentru această lecție' });
+      if (!lesson) {
+        return res.status(404).json({ message: 'Lesson not found.' });
       }
   
-      const quiz = await Quiz.findById(lesson.quiz).populate('questions');
+      if (!lesson.quiz) {
+        return res.status(404).json({ message: 'Quiz not found for this lesson.' });
+      }
   
-      // Calculăm scorul
+      const quiz = await Quiz.findById(lesson.quiz._id).populate('questions.options');
+  
+      if (!Array.isArray(answers)) {
+        return res.status(400).json({ message: 'Answers should be an array.' });
+      }
+  
+      // Procesare răspunsuri și calculare scor
       let score = 0;
-      quiz.questions.forEach((question, index) => {
-        if (question.correctOption === answers[index]) {
-          score++;
+      const processedAnswers = answers.map((answer) => {
+        const question = quiz.questions.id(answer.questionId);
+        if (!question) {
+          throw new Error(`Question with ID ${answer.questionId} not found in quiz.`);
         }
+  
+        const isCorrect = answer.selectedOption === question.correctAnswer;
+        if (isCorrect) score++;
+  
+        return {
+          questionId: question._id,
+          selectedOption: answer.selectedOption,
+          isCorrect: isCorrect,
+        };
       });
   
-      // Salvăm rezultatul în baza de date dacă este necesar
-      // Exemplu: creăm un nou document Result sau actualizăm profilul studentului
-  
-      res.json({ score });
-    } catch (error) {
-      console.error('Eroare la trimiterea răspunsurilor quiz-ului:', error);
-      res.status(500).json({ message: 'Eroare de server' });
-    }
-  };
-export const submitQuiz = async (req, res) => {
-    try {
-      const quiz = await Quiz.findById(req.params.id);
-      if (!quiz) {
-        return res.status(404).json({ message: 'Quiz-ul nu a fost găsit' });
-      }
-  
-      const { answers } = req.body;
-  
-      let score = 0;
-      const processedAnswers = [];
-  
-      for (const answer of answers) {
-        const question = quiz.questions.id(answer.questionId);
-        if (question) {
-          const isCorrect = answer.selectedOption === question.correctAnswer;
-          if (isCorrect) {
-            score += 1;
-          }
-          processedAnswers.push({
-            questionId: question._id,
-            selectedOption: answer.selectedOption,
-            isCorrect,
-          });
-        }
-      }
-  
+      // Salvare rezultat
       const studentQuizResult = new StudentQuizResult({
-        student: req.user.id,
+        student: studentId,
         quiz: quiz._id,
+        lesson: lessonId,
+        score: score,
         answers: processedAnswers,
-        score,
       });
   
       await studentQuizResult.save();
   
-      res.json({ message: 'Quiz trimis' });
+      res.json({ score });
     } catch (error) {
-      console.error('Eroare la trimiterea quiz-ului:', error);
+      console.error('Error submitting quiz answers:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  };
+
+  export const submitFeedback = async (req, res) => {
+    try {
+      const lesson = await Lesson.findById(req.params.id);
+      if (!lesson) {
+        return res.status(404).json({ message: 'Lecția nu a fost găsită' });
+      }
+  
+      const student = await User.findById(req.user.id).populate('class');
+      if (!student || lesson.class.toString() !== student.class._id.toString()) {
+        return res.status(403).json({ message: 'Nu aveți acces la această lecție' });
+      }
+  
+      const { feedbackText, rating, isAnonymous } = req.body;
+  
+      // Validare rating
+      if (rating < 1 || rating > 5) {
+        return res.status(400).json({ message: 'Rating-ul trebuie să fie între 1 și 5' });
+      }
+  
+      // Pregătim datele feedback-ului
+      const feedbackData = {
+        lesson: lesson._id,
+        feedbackText,
+        rating,
+        isAnonymous,
+      };
+  
+      // Adăugăm studentul doar dacă feedback-ul nu este anonim
+      if (!isAnonymous) {
+        feedbackData.student = req.user.id;
+      }
+  
+      const feedback = new Feedback(feedbackData);
+  
+      await feedback.save();
+  
+      res.json({ message: 'Feedback trimis' });
+    } catch (error) {
+      console.error('Eroare la trimiterea feedback-ului:', error);
       res.status(500).json({ message: 'Eroare de server' });
     }
   };
 
-export const submitFeedback = async (req, res) => {
-  try {
-    const lesson = await Lesson.findById(req.params.id);
-    if (!lesson) {
-      return res.status(404).json({ message: 'Lecția nu a fost găsită' });
+  export const markAttendance = async (req, res) => {
+    try {
+      const lesson = await Lesson.findById(req.params.id);
+      if (!lesson) {
+        return res.status(404).json({ message: 'Lecția nu a fost găsită' });
+      }
+  
+      const student = await User.findById(req.user.id).populate('class');
+      if (!student || lesson.class.toString() !== student.class._id.toString()) {
+        return res.status(403).json({ message: 'Nu aveți acces la această lecție' });
+      }
+  
+      const existingAttendance = await Attendance.findOne({
+        student: req.user.id,
+        lesson: lesson._id,
+      });
+  
+      if (existingAttendance) {
+        // Dacă prezența există, o retragem (unmark)
+        await Attendance.deleteOne({ _id: existingAttendance._id });
+        return res.json({ message: 'Prezența a fost retrasă' });
+      }
+  
+      // Dacă nu există, o marcăm (mark)
+      const attendance = new Attendance({
+        student: req.user.id,
+        lesson: lesson._id,
+        attended: true,
+      });
+  
+      await attendance.save();
+  
+      res.json({ message: 'Prezență marcată' });
+    } catch (error) {
+      console.error('Eroare la marcarea prezenței:', error);
+      res.status(500).json({ message: 'Eroare de server' });
     }
+  };
 
-    const student = await User.findById(req.user.id).populate('class');
-    if (!student || lesson.class.toString() !== student.class._id.toString()) {
-      return res.status(403).json({ message: 'Nu aveți acces la această lecție' });
+  export const getAttendanceStatus = async (req, res) => {
+    try {
+      const lesson = await Lesson.findById(req.params.id);
+      if (!lesson) {
+        return res.status(404).json({ message: 'Lecția nu a fost găsită' });
+      }
+  
+      const student = await User.findById(req.user.id).populate('class');
+      if (!student || lesson.class.toString() !== student.class._id.toString()) {
+        return res.status(403).json({ message: 'Nu aveți acces la această lecție' });
+      }
+  
+      const attendance = await Attendance.findOne({
+        student: req.user.id,
+        lesson: lesson._id,
+      });
+  
+      if (attendance) {
+        return res.json({ attended: attendance.attended });
+      } else {
+        return res.json({ attended: false });
+      }
+    } catch (error) {
+      console.error('Eroare la obținerea stării prezenței:', error);
+      res.status(500).json({ message: 'Eroare de server' });
     }
-
-    const { feedbackText } = req.body;
-
-    const feedback = new Feedback({
-      student: req.user.id,
-      lesson: lesson._id,
-      feedbackText,
-    });
-
-    await feedback.save();
-
-    res.json({ message: 'Feedback trimis' });
-  } catch (error) {
-    console.error('Eroare la trimiterea feedback-ului:', error);
-    res.status(500).json({ message: 'Eroare de server' });
-  }
-};
-
-export const markAttendance = async (req, res) => {
-  try {
-    const lesson = await Lesson.findById(req.params.id);
-    if (!lesson) {
-      return res.status(404).json({ message: 'Lecția nu a fost găsită' });
-    }
-
-    const student = await User.findById(req.user.id).populate('class');
-    if (!student || lesson.class.toString() !== student.class._id.toString()) {
-      return res.status(403).json({ message: 'Nu aveți acces la această lecție' });
-    }
-
-    const existingAttendance = await Attendance.findOne({
-      student: req.user.id,
-      lesson: lesson._id,
-    });
-
-    if (existingAttendance) {
-      return res.status(400).json({ message: 'Prezența a fost deja marcată' });
-    }
-
-    const attendance = new Attendance({
-      student: req.user.id,
-      lesson: lesson._id,
-      attended: true,
-    });
-
-    await attendance.save();
-
-    res.json({ message: 'Prezență marcată' });
-  } catch (error) {
-    console.error('Eroare la marcarea prezenței:', error);
-    res.status(500).json({ message: 'Eroare de server' });
-  }
-};
+  };
 
